@@ -197,7 +197,7 @@
 
     var box = el("div", "player vocal");
     box.appendChild(el("h3", null, "唱歌版 · 副歌（合成人聲）"));
-    box.appendChild(el("p", "hint", "逐個字對準音高同拍子合成，配和弦 pad、bass 同底鼓。咬字會有機械感，但旋律、節奏、歌詞都係呢首歌本身。"));
+    box.appendChild(el("p", "hint", "用母音頻譜包絡激勵目標音高嘅諧波：音高、拍子、歌詞都準，共振峰保留。聲底仍然係合成器，唔係真人。"));
 
     var audio = document.createElement("audio");
     audio.controls = true;

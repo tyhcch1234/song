@@ -19,7 +19,7 @@ assets/app.js           列表 / 歌曲頁渲染 + 播放器
 assets/songs.js         ★ 所有歌曲資料（唯一需要手改嘅檔）
 assets/audio/           旋律示範 + 唱歌版音檔（由工具自動產生）
 tools/make-audio.js     由 chorusMelody 合成旋律 wav
-tools/sing.py           合成唱歌版（TTS 逐字對音高 + 伴奏）
+tools/sing.py           合成唱歌版（共振峰包絡 + 諧波激勵）
 ```
 
 ## 新增一首歌
@@ -73,21 +73,23 @@ node tools/make-audio.js my-new-song  # 指定一首
 ```bash
 python3 tools/sing.py                # 全部有 chorusMelody 嘅歌
 python3 tools/sing.py hand-in-smoke  # 指定一首
+VOCAL_OCTAVE=-1 python3 tools/sing.py  # 想降八度唱（預設用記譜音域 C4–C5）
+STEM=/tmp/stem.wav python3 tools/sing.py  # 另存人聲乾軌，方便驗證
 ```
 
-流程：逐個字用 `zh-HK-HiuMaanNeural` 發聲 → 自相關量基頻 → 移調到目標音高（旋律降八度，貼近人聲自然音域）→ 用樂音週期長度做 overlap-add 拉長尾音 → 長音加顫音 → 疊上 C–G–Am–Em–F–C–F–G 和弦 pad、bass 同底鼓。
+做法（唔用外部模型，純 numpy/scipy）：
 
-輸出 `assets/audio/<id>-vocal.wav`。實測音高誤差中位數 1.2%，46 個音有 42 個喺 5% 內。
+1. 逐個字用 `zh-HK-HiuMaanNeural` 發音，裁走前後靜音
+2. 逐幀自相關搵有聲段，對母音段做平均幅度譜 + 倒頻譜 lifter → **共振峰包絡**
+3. 用目標音高生成諧波，幅度喺包絡上按 `k×f0` 取樣 → **音高精準、共振峰唔會被拉高**（前兩版用變速變調整段音，所以似讀字）
+4. 音頭 70ms 由前一個音 glide 過去、長音加 5.2 Hz 顫音、聲母段保留原音
+5. 疊和弦 pad + 琶音 + bass + 底鼓，一小節前奏，卷積 reverb
 
-想睇人聲軌（唔要伴奏）方便檢查：
+輸出 `assets/audio/<id>-vocal.wav`（約 29 秒，含前奏）。
 
-```bash
-STEM=/tmp/stem.wav python3 tools/sing.py hand-in-smoke
-```
+實測：**46 個音全部誤差 ≤0.1%**；母音頻譜包絡同原音相關 0.845，共振峰位置一致（例：280/680/1120 Hz 前後不變）。
 
-要求：`pip install edge-tts soundfile numpy scipy`（需要網絡連到 Microsoft 語音服務）。逐字發音快取喺 `tools/.vox-cache/`，唔會入 git。
-
-> 老實講：呢個係合成人聲 demo，咬字、換氣、共鳴都係機器味，唔會似真人歌手。旋律、拍子、歌詞係準嘅，用嚟試唱、試速度、試 key 就得。要真人質感就要請歌手或者用專門嘅歌聲合成模型。
+> 限制：呢個係「頻譜包絡 + 諧波」嘅歌聲合成，會似 vocoder／舊式歌聲合成器，唔會似 Suno 或真人。強項係音高、拍子、歌詞準，適合試旋律、試速度、試 key、做 demo 底。要真·唱歌質感，用 `prompts/` 入面嘅 Suno 提示包生成，再放返 `assets/audio/`。
 
 ## 本機預覽
 
