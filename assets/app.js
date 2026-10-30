@@ -297,6 +297,9 @@
     });
     app.appendChild(body);
 
+    var vocal = buildVocalPlayer(song);
+    if (vocal) app.appendChild(vocal);
+
     var player = buildPlayer(song);
     if (player) app.appendChild(player);
 
