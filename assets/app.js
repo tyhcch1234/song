@@ -23,16 +23,10 @@
 
   function jianpu(note) {
     var m = /^([A-G])(#|b)?(-?\d)$/.exec(note);
-    if (!m) return el("span", "jp", note);
-    var deg = DEG[m[1]];
-    if (m[2] === "#") deg += "";
-    var oct = parseInt(m[3], 10);
     var box = el("span", "jp");
-    if (m[2] === "#") {
-      box.appendChild(el("span", null, "♯" + deg));
-    } else {
-      box.appendChild(document.createTextNode(String(deg)));
-    }
+    if (!m) { box.textContent = note; return box; }
+    var oct = parseInt(m[3], 10);
+    box.appendChild(document.createTextNode((m[2] === "#" ? "♯" : "") + DEG[m[1]]));
     if (oct > 4) box.appendChild(el("sup", null, "·"));
     if (oct < 4) box.appendChild(el("sub", null, "·"));
     return box;
@@ -54,22 +48,19 @@
 
     var bpm = (song.meta && song.meta.bpm) || 80;
     var spb = 60 / bpm;
-    var box = el("div", "player");
 
+    var box = el("div", "player");
     box.appendChild(el("h3", null, mel.label || "旋律示範"));
     if (mel.note) box.appendChild(el("p", "hint", mel.note));
 
-    var ctrl = el("div", "controls");
-    var btn = el("button", "btn", "▶ 播放旋律");
-    btn.type = "button";
-    ctrl.appendChild(btn);
-    ctrl.appendChild(el("span", "tempo", "♩ = " + bpm));
-    box.appendChild(ctrl);
-
+    /* --- 簡譜格 + 每個音嘅起始秒數 --- */
     var grid = el("div", "melody");
-    var noteEls = [];
-    var lines = {};
+    var cells = [], starts = [], acc = 0, lines = {};
+
     mel.notes.forEach(function (n) {
+      starts.push(acc);
+      acc += n.d * spb;
+
       var key = n.line || 1;
       if (!lines[key]) {
         lines[key] = el("div", "mline");
@@ -80,83 +71,124 @@
       cell.appendChild(jianpu(n.n));
       if (n.s) cell.appendChild(el("span", "syl", n.s));
       lines[key].appendChild(cell);
-      noteEls.push(cell);
+      cells.push(cell);
     });
+
+    function highlight(i) {
+      for (var k = 0; k < cells.length; k++) {
+        if (k === i) cells[k].classList.add("on");
+        else cells[k].classList.remove("on");
+      }
+    }
+
+    /* --- 主播放器：真音檔（iOS 靜音掣下仍然有聲，同 <video> 一樣走媒體聲道） --- */
+    var audio = document.createElement("audio");
+    audio.controls = true;
+    audio.preload = "metadata";
+    audio.src = "assets/audio/" + song.id + "-chorus.wav";
+
+    var audioWrap = el("div", "audio-wrap");
+    audioWrap.appendChild(audio);
+    box.appendChild(audioWrap);
     box.appendChild(grid);
 
-    var ctx = null, timers = [], playing = false;
+    var tip = el("p", "tip", "冇聲？先檢查手機側邊嘅靜音掣同媒體音量，再按一次播放。");
+    box.appendChild(tip);
 
-    function clearHighlight() {
-      noteEls.forEach(function (c) { c.classList.remove("on"); });
-    }
+    var failing = false;
+
+    audio.addEventListener("play", function () { box.classList.add("playing"); });
+    audio.addEventListener("pause", function () { box.classList.remove("playing"); highlight(-1); });
+    audio.addEventListener("ended", function () { highlight(-1); });
+
+    audio.addEventListener("timeupdate", function () {
+      var t = audio.currentTime;
+      var idx = -1;
+      for (var i = 0; i < starts.length; i++) {
+        if (t >= starts[i] && t < starts[i] + mel.notes[i].d * spb) { idx = i; break; }
+      }
+      highlight(idx);
+    });
+
+    audio.addEventListener("error", function () {
+      if (failing) return;
+      failing = true;
+      audioWrap.parentNode && audioWrap.parentNode.removeChild(audioWrap);
+      grid.parentNode && grid.parentNode.removeChild(grid);
+      tip.textContent = "音檔載入唔到，改用即時合成播放。";
+      box.insertBefore(buildSynthFallback(mel, bpm, cells, grid), tip);
+    });
+
+    // 點簡譜任何一個音 → 由嗰度開始播
+    cells.forEach(function (cell, i) {
+      cell.addEventListener("click", function () {
+        if (failing) return;
+        audio.currentTime = starts[i] + 0.01;
+        var p = audio.play();
+        if (p && p.catch) p.catch(function () {});
+      });
+    });
+
+    return box;
+  }
+
+  /* --- 後備：Web Audio 即時合成 --- */
+  function buildSynthFallback(mel, bpm, noteEls, grid) {
+    var spb = 60 / bpm;
+    var wrap = el("div", "controls");
+    var btn = el("button", "btn", "▶ 播放旋律");
+    btn.type = "button";
+    wrap.appendChild(btn);
+    wrap.appendChild(el("span", "tempo", "♩ = " + bpm));
+
+    var ctx = null, timers = [], playing = false;
 
     function stop() {
       playing = false;
       timers.forEach(clearTimeout);
       timers = [];
       if (ctx) { ctx.close(); ctx = null; }
-      clearHighlight();
+      noteEls.forEach(function (c) { c.classList.remove("on"); });
       btn.textContent = "▶ 播放旋律";
     }
 
     btn.addEventListener("click", function () {
       if (playing) { stop(); return; }
       var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) { btn.textContent = "此瀏覽器不支援試聽"; return; }
+      if (!AC) { btn.textContent = "此瀏覽器唔支援播放"; return; }
 
       ctx = new AC();
+      if (ctx.state === "suspended" && ctx.resume) ctx.resume();
       playing = true;
       btn.textContent = "■ 停止";
-      clearHighlight();
 
-      var t0 = ctx.currentTime + 0.12;
-      var t = t0;
-
+      var t0 = ctx.currentTime + 0.12, t = t0;
       mel.notes.forEach(function (n, i) {
-        var dur = n.d * spb;
-        var f = freq(n.n);
-
-        var osc = ctx.createOscillator();
-        var osc2 = ctx.createOscillator();
-        var gain = ctx.createGain();
-        var gain2 = ctx.createGain();
-
+        var dur = n.d * spb, f = freq(n.n);
+        var osc = ctx.createOscillator(), gain = ctx.createGain();
         osc.type = "triangle";
         osc.frequency.value = f;
-        osc2.type = "sine";
-        osc2.frequency.value = f / 2;
-
         gain.gain.setValueAtTime(0.0001, t);
-        gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.95);
-
-        gain2.gain.setValueAtTime(0.0001, t);
-        gain2.gain.exponentialRampToValueAtTime(0.07, t + 0.03);
-        gain2.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.9);
-
-        osc.connect(gain).connect(ctx.destination);
-        osc2.connect(gain2).connect(ctx.destination);
-
+        osc.connect(gain);
+        gain.connect(ctx.destination);
         osc.start(t); osc.stop(t + dur);
-        osc2.start(t); osc2.stop(t + dur);
 
-        var cellEl = noteEls[i];
-        var offset = (t - t0) * 1000;
+        var off = (t - t0) * 1000;
         timers.push(setTimeout(function () {
-          clearHighlight();
-          cellEl.classList.add("on");
-        }, offset));
+          noteEls.forEach(function (c) { c.classList.remove("on"); });
+          noteEls[i] && noteEls[i].classList.add("on");
+        }, off));
         timers.push(setTimeout(function () {
-          cellEl.classList.remove("on");
-        }, offset + dur * 950));
-
+          noteEls[i] && noteEls[i].classList.remove("on");
+        }, off + dur * 950));
         t += dur;
       });
-
-      timers.push(setTimeout(stop, (t - t0) * 1000 + 500));
+      timers.push(setTimeout(stop, (t - t0) * 1000 + 400));
     });
 
-    return box;
+    return wrap;
   }
 
   /* ---------------- 版面 ---------------- */

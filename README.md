@@ -13,10 +13,12 @@
 ## 專案結構
 
 ```
-index.html            頁面外殼
-assets/style.css      樣式
-assets/app.js         列表 / 歌曲頁渲染 + 旋律試聽播放器
-assets/songs.js       ★ 所有歌曲資料（唯一需要改嘅檔）
+index.html              頁面外殼
+assets/style.css        樣式
+assets/app.js           列表 / 歌曲頁渲染 + 播放器
+assets/songs.js         ★ 所有歌曲資料（唯一需要手改嘅檔）
+assets/audio/           旋律示範音檔（由工具自動產生）
+tools/make-audio.js     由 chorusMelody 合成 wav
 ```
 
 ## 新增一首歌
@@ -25,7 +27,7 @@ assets/songs.js       ★ 所有歌曲資料（唯一需要改嘅檔）
 
 ```js
 {
-  id: "my-new-song",          // 用英文小寫加連字號，會成為網址 #/s/my-new-song
+  id: "my-new-song",          // 英文小寫加連字號，會成為網址 #/s/my-new-song
   no: 2,                      // 編號，遞增
   title: "歌名",
   subtitle: "English Title",  // 可選
@@ -47,7 +49,23 @@ assets/songs.js       ★ 所有歌曲資料（唯一需要改嘅檔）
 }
 ```
 
-`n` 用科學音名（`C4`、`G4`、`A4`、`C5`…），`d` 係拍數（0.5 = 八分音符，1 = 四分音符）。簡譜數字會由音名自動換算，唔需要另外手打。
+`n` 用科學音名（`C4`、`G4`、`A4`、`C5`…），`d` 係拍數（0.5 = 八分音符，1 = 四分音符）。簡譜數字由音名自動換算，唔需要另外手打。
+
+## 旋律音檔
+
+寫好 `chorusMelody` 之後行一次：
+
+```bash
+node tools/make-audio.js            # 全部
+node tools/make-audio.js my-new-song  # 指定一首
+```
+
+會按 `meta.bpm` 同拍數合成 `assets/audio/<id>-chorus.wav`（22050 Hz、單聲道、16-bit，約 1 MB/首）。
+播放器會自動用呢個路徑；**檔案唔存在或者載入失敗，會自動退回瀏覽器即時合成**，唔會靜靜地冇聲。
+
+用 wav 而唔用 mp3，係因為唔想 build 流程依賴 ffmpeg／lame 等外部程式——任何電腦 `node` 一行就出到，且所有瀏覽器（包括 iOS Safari）原生支援。
+
+> 手機聽唔到聲，通常係側邊嘅**靜音掣**或者媒體音量。用 `<audio>` 播檔案走媒體聲道，唔受靜音掣影響；之前用 Web Audio 即時合成就會被靜音掣完全靜音，所以已經換走。
 
 ## 本機預覽
 
