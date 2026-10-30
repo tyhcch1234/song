@@ -139,6 +139,7 @@ window.SONGS = [
       }
     ],
     vocalAudio: "assets/audio/hand-in-smoke-vocal.wav",
+    sunoPrompt: "https://github.com/tyhcch1234/song/blob/main/prompts/01-hand-in-smoke-suno.md",
     chorusMelody: {
       label: "副歌旋律示範",
       note: "簡譜以 C 大調記，數字下面嘅字係對應歌詞。播放時會逐個音亮起；點任何一個音，可以由嗰度開始聽。",

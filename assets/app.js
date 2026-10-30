@@ -209,6 +209,20 @@
     wrap.appendChild(audio);
     box.appendChild(wrap);
 
+    if (song.sunoPrompt) {
+      var p2 = el("p", "tip");
+      p2.appendChild(document.createTextNode("想聽真人聲版本？"));
+      var a = document.createElement("a");
+      a.href = song.sunoPrompt;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "Suno 複製貼上包";
+      a.style.color = "var(--gold)";
+      p2.appendChild(a);
+      p2.appendChild(document.createTextNode("已經備好風格描述同全首歌詞。"));
+      box.appendChild(p2);
+    }
+
     return box;
   }
 
