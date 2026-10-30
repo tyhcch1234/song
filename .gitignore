@@ -1,0 +1,3 @@
+tools/.vox-cache/
+*.pyc
+__pycache__/

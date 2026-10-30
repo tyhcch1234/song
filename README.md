@@ -17,8 +17,9 @@ index.html              頁面外殼
 assets/style.css        樣式
 assets/app.js           列表 / 歌曲頁渲染 + 播放器
 assets/songs.js         ★ 所有歌曲資料（唯一需要手改嘅檔）
-assets/audio/           旋律示範音檔（由工具自動產生）
-tools/make-audio.js     由 chorusMelody 合成 wav
+assets/audio/           旋律示範 + 唱歌版音檔（由工具自動產生）
+tools/make-audio.js     由 chorusMelody 合成旋律 wav
+tools/sing.py           合成唱歌版（TTS 逐字對音高 + 伴奏）
 ```
 
 ## 新增一首歌
@@ -66,6 +67,27 @@ node tools/make-audio.js my-new-song  # 指定一首
 用 wav 而唔用 mp3，係因為唔想 build 流程依賴 ffmpeg／lame 等外部程式——任何電腦 `node` 一行就出到，且所有瀏覽器（包括 iOS Safari）原生支援。
 
 > 手機聽唔到聲，通常係側邊嘅**靜音掣**或者媒體音量。用 `<audio>` 播檔案走媒體聲道，唔受靜音掣影響；之前用 Web Audio 即時合成就會被靜音掣完全靜音，所以已經換走。
+
+## 唱歌版（合成人聲）
+
+```bash
+python3 tools/sing.py                # 全部有 chorusMelody 嘅歌
+python3 tools/sing.py hand-in-smoke  # 指定一首
+```
+
+流程：逐個字用 `zh-HK-HiuMaanNeural` 發聲 → 自相關量基頻 → 移調到目標音高（旋律降八度，貼近人聲自然音域）→ 用樂音週期長度做 overlap-add 拉長尾音 → 長音加顫音 → 疊上 C–G–Am–Em–F–C–F–G 和弦 pad、bass 同底鼓。
+
+輸出 `assets/audio/<id>-vocal.wav`。實測音高誤差中位數 1.2%，46 個音有 42 個喺 5% 內。
+
+想睇人聲軌（唔要伴奏）方便檢查：
+
+```bash
+STEM=/tmp/stem.wav python3 tools/sing.py hand-in-smoke
+```
+
+要求：`pip install edge-tts soundfile numpy scipy`（需要網絡連到 Microsoft 語音服務）。逐字發音快取喺 `tools/.vox-cache/`，唔會入 git。
+
+> 老實講：呢個係合成人聲 demo，咬字、換氣、共鳴都係機器味，唔會似真人歌手。旋律、拍子、歌詞係準嘅，用嚟試唱、試速度、試 key 就得。要真人質感就要請歌手或者用專門嘅歌聲合成模型。
 
 ## 本機預覽
 

@@ -191,6 +191,27 @@
     return wrap;
   }
 
+  /* --- 唱歌版：成首歌嘅合成人聲 demo --- */
+  function buildVocalPlayer(song) {
+    if (!song.vocalAudio) return null;
+
+    var box = el("div", "player vocal");
+    box.appendChild(el("h3", null, "唱歌版 · 副歌（合成人聲）"));
+    box.appendChild(el("p", "hint", "逐個字對準音高同拍子合成，配和弦 pad、bass 同底鼓。咬字會有機械感，但旋律、節奏、歌詞都係呢首歌本身。"));
+
+    var audio = document.createElement("audio");
+    audio.controls = true;
+    audio.preload = "metadata";
+    audio.src = song.vocalAudio;
+    audio.addEventListener("error", function () { box.style.display = "none"; });
+
+    var wrap = el("div", "audio-wrap");
+    wrap.appendChild(audio);
+    box.appendChild(wrap);
+
+    return box;
+  }
+
   /* ---------------- 版面 ---------------- */
   function renderList() {
     app.innerHTML = "";
